@@ -1,0 +1,45 @@
+models:
+  image:
+    # Diffusers pipeline approach (simple, auto-downloads)
+    pipeline:
+      name: "Tongyi-MAI/Z-Image-Turbo"
+      torch_dtype: "bfloat16"
+      device: "cuda"
+
+    # Split files approach (ComfyUI style)
+    split_files:
+      # HuggingFace source for downloading
+      repo_id: "Comfy-Org/z_image_turbo"
+      text_encoder: "split_files/text_encoders/qwen_3_4b.safetensors"
+      diffusion_model: "split_files/diffusion_models/z_image_turbo_bf16.safetensors"
+      vae: "split_files/vae/ae.safetensors"
+      # Alternative quantized versions:
+      # text_encoder_fp8: "split_files/text_encoders/qwen_3_4b_fp8_mixed.safetensors"
+      # diffusion_model_fp4: "split_files/diffusion_models/z_image_turbo_nvfp4.safetensors"
+
+    # Local model paths (use these if models are copied locally)
+    local:
+      text_encoder: "models/text_encoders/qwen_3_4b.safetensors"
+      diffusion_model: "models/diffusion_models/z_image_turbo_bf16.safetensors"
+      vae: "models/vae/ae.safetensors"
+
+    # Generation defaults
+    default_steps: 8
+    default_size: [1024, 1024]
+    guidance_scale: 1.0
+    sampler: "euler_ancestral"
+
+  llm:
+    # HuggingFace model
+    name: "Qwen/Qwen2.5-7B-Instruct"
+    # Local path (use if model is copied locally)
+    local_path: "models/llm/Qwen2.5-7B-Instruct"
+    torch_dtype: "bfloat16"
+    device: "cuda"
+    max_new_tokens: 512
+
+paths:
+  # HuggingFace cache directory
+  cache_dir: "~/.cache/image_gen"
+  # Local models directory (relative to project root)
+  models_dir: "./models"

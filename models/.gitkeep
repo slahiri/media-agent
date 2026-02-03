@@ -1,0 +1,11 @@
+# Place downloaded models here
+# Directory structure:
+#   models/
+#   ├── text_encoders/
+#   │   └── qwen_3_4b.safetensors
+#   ├── diffusion_models/
+#   │   └── z_image_turbo_bf16.safetensors
+#   ├── vae/
+#   │   └── ae.safetensors
+#   └── llm/
+#       └── Qwen2.5-7B-Instruct/
