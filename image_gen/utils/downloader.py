@@ -55,6 +55,7 @@ def get_split_file_paths(config_path: str | Path | None = None) -> dict[str, Pat
 def download_image_model_pipeline(
     config_path: str | Path | None = None,
     model_name: str | None = None,
+    **kwargs,  # Accept extra kwargs for compatibility
 ) -> str:
     """Download the Z-Image model using diffusers pipeline approach.
 
