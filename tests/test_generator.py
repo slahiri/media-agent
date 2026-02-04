@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import MagicMock, patch, PropertyMock
 from pathlib import Path
 
-from media_utils.image.generator import ImageGenerator
+from media_agent.image.generator import ImageGenerator
 
 
 class TestImageGeneratorInit:
@@ -49,7 +49,7 @@ class TestImageGeneratorPipeline:
         gen = ImageGenerator(config_path=sample_config)
         assert gen._pipeline is None
 
-    @patch("media_utils.image.generator.ZImagePipeline", create=True)
+    @patch("media_agent.image.generator.ZImagePipeline", create=True)
     def test_pipeline_loads_on_access(self, mock_pipeline_class, sample_config):
         """Test that pipeline loads when accessed."""
         # Setup mock
@@ -60,7 +60,7 @@ class TestImageGeneratorPipeline:
             gen = ImageGenerator(config_path=sample_config)
 
             # Patch the import inside _load_pipeline
-            with patch("media_utils.image.generator.ZImagePipeline", mock_pipeline_class, create=True):
+            with patch("media_agent.image.generator.ZImagePipeline", mock_pipeline_class, create=True):
                 # Access pipeline property - this would trigger loading
                 # We can't fully test this without the actual diffusers module
                 pass

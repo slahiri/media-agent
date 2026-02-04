@@ -1,5 +1,5 @@
 """LangGraph Agent for media generation."""
 
-from media_utils.agent.agent import MediaAgent
+from media_agent.agent.agent import MediaAgent
 
 __all__ = ["MediaAgent"]

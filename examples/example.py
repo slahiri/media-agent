@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Example usage of MediaAgent."""
 
-from media_utils import MediaAgent
+from media_agent import MediaAgent
 
 
 def main():

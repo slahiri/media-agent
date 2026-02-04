@@ -4,7 +4,7 @@ This library provides a LangGraph-based agent that can generate images
 from natural language prompts using Z-Image-Turbo and Qwen LLM.
 
 Example:
-    >>> from media_utils import MediaAgent
+    >>> from media_agent import MediaAgent
     >>>
     >>> agent = MediaAgent()
     >>> result = agent.run("Generate a sunset over mountains")
@@ -13,7 +13,7 @@ Example:
     >>> agent.unload()
 """
 
-from media_utils.agent import MediaAgent
+from media_agent.agent import MediaAgent
 
 __version__ = "0.2.0"
 

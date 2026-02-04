@@ -4,7 +4,7 @@ from pathlib import Path
 
 from huggingface_hub import snapshot_download, hf_hub_download
 
-from media_utils.config import load_config
+from media_agent.config import load_config
 
 
 def get_project_root(config_path: str | Path | None = None) -> Path:
@@ -309,14 +309,14 @@ Qwen LLM (Agent Reasoning)
 Download Commands
 =================
   # Download all models
-  python -m media_utils.utils.downloader all
+  python -m media_agent.tools.downloader all
 
   # Download all (split files for image, copy to local)
-  python -m media_utils.utils.downloader all split --local
+  python -m media_agent.tools.downloader all split --local
 
   # Download individual models
-  python -m media_utils.utils.downloader image [pipeline|split]
-  python -m media_utils.utils.downloader llm
+  python -m media_agent.tools.downloader image [pipeline|split]
+  python -m media_agent.tools.downloader llm
 """)
 
 
@@ -326,7 +326,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
 
     if not args or args[0] == "help":
-        print("Usage: python -m media_utils.utils.downloader <command> [options]")
+        print("Usage: python -m media_agent.tools.downloader <command> [options]")
         print()
         print("Commands:")
         print("  list                    - List available models")

@@ -29,7 +29,7 @@ uv pip install -e .
 ### 3. Download models
 
 ```bash
-python -m media_utils.utils.downloader all
+python -m media_agent.tools.downloader all
 ```
 
 ### 4. Run the agent
@@ -43,7 +43,7 @@ python examples/example.py
 ### Natural Language (via LLM)
 
 ```python
-from media_utils import MediaAgent
+from media_agent import MediaAgent
 
 agent = MediaAgent()
 
@@ -61,7 +61,7 @@ agent.unload()
 ### Direct Generation (bypass LLM)
 
 ```python
-from media_utils import MediaAgent
+from media_agent import MediaAgent
 
 agent = MediaAgent()
 
@@ -80,7 +80,7 @@ agent.unload()
 ### Context Manager (auto cleanup)
 
 ```python
-from media_utils import MediaAgent
+from media_agent import MediaAgent
 
 with MediaAgent() as agent:
     agent.run("Generate a forest landscape")

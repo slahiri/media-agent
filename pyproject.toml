@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "media-utils"
+name = "media-agent"
 version = "0.2.0"
 description = "AI agent for image generation using natural language"
 readme = "README.md"
@@ -48,13 +48,13 @@ python_functions = ["test_*"]
 addopts = "-v --tb=short"
 
 [project.urls]
-Homepage = "https://github.com/slahiri/media-utils"
-Repository = "https://github.com/slahiri/media-utils"
-Changelog = "https://github.com/slahiri/media-utils/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/slahiri/media-agent"
+Repository = "https://github.com/slahiri/media-agent"
+Changelog = "https://github.com/slahiri/media-agent/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["media_utils*"]
+include = ["media_agent*"]
 
 [tool.setuptools.package-data]
-media_utils = ["../config.yaml"]
+media_agent = ["../config.yaml"]

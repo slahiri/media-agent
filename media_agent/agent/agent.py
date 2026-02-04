@@ -21,7 +21,7 @@ class MediaAgent:
     The agent interprets natural language requests and generates images.
 
     Example:
-        >>> from media_utils import MediaAgent
+        >>> from media_agent import MediaAgent
         >>>
         >>> # Basic usage
         >>> agent = MediaAgent()
@@ -74,7 +74,7 @@ class MediaAgent:
     def llm(self):
         """Lazy-load the LLM."""
         if self._llm is None:
-            from media_utils.llm.qwen import QwenLLM
+            from media_agent.llm.qwen import QwenLLM
             print(f"Loading LLM: {self.llm_model}")
             self._llm = QwenLLM(
                 model_name=self.llm_model,
@@ -86,7 +86,7 @@ class MediaAgent:
     def generator(self):
         """Lazy-load the image generator."""
         if self._generator is None:
-            from media_utils.image.generator import ImageGenerator
+            from media_agent.image.generator import ImageGenerator
             print(f"Loading ImageGenerator: mode={self.image_mode}")
             self._generator = ImageGenerator(
                 mode=self.image_mode,
