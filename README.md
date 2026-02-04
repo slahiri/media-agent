@@ -1,5 +1,11 @@
 # MediaAgent
 
+[![PyPI version](https://img.shields.io/pypi/v/media-agent.svg)](https://pypi.org/project/media-agent/)
+[![Python](https://img.shields.io/pypi/pyversions/media-agent.svg)](https://pypi.org/project/media-agent/)
+[![License](https://img.shields.io/github/license/slahiri/media-agent.svg)](https://github.com/slahiri/media-agent/blob/main/LICENSE)
+[![Build](https://img.shields.io/github/actions/workflow/status/slahiri/media-agent/publish.yml?branch=main)](https://github.com/slahiri/media-agent/actions)
+[![Downloads](https://img.shields.io/pypi/dm/media-agent.svg)](https://pypi.org/project/media-agent/)
+
 AI-powered image generation with natural language. Features an interactive CLI with multiple LLM providers and image backends.
 
 ## Quick Start
