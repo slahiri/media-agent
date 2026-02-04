@@ -1,224 +1,198 @@
-"""Tests for the MediaAgent and tools."""
+"""Tests for the MediaAgent."""
 
 import pytest
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 from pathlib import Path
 
-from media_utils.agent.tools import (
-    ImageGenerationTool,
-    OCRTool,
-    create_tools,
-    ImageGenerationInput,
-    OCRInput,
-)
-from media_utils.agent.graph import MediaAgent
+from media_utils.agent.agent import MediaAgent
 
 
-class TestImageGenerationTool:
-    """Tests for ImageGenerationTool."""
+class TestMediaAgentInit:
+    """Tests for MediaAgent initialization."""
 
-    def test_tool_name_and_description(self):
-        """Test tool has correct name and description."""
-        tool = ImageGenerationTool()
-        assert tool.name == "generate_image"
-        assert "generate" in tool.description.lower()
-        assert "image" in tool.description.lower()
+    def test_init_defaults(self):
+        """Test default initialization."""
+        agent = MediaAgent()
 
-    def test_tool_args_schema(self):
-        """Test tool has correct args schema."""
-        tool = ImageGenerationTool()
-        assert tool.args_schema == ImageGenerationInput
+        assert agent.output_dir == Path("output")
+        assert agent.llm_model == "Qwen/Qwen2.5-7B-Instruct"
+        assert agent.image_mode == "pipeline"
+        assert agent.offload_mode == "model"
+        assert agent.device == "cuda"
 
-    def test_run_generates_image(self, temp_dir):
-        """Test that tool generates and saves an image."""
-        tool = ImageGenerationTool(output_dir=str(temp_dir))
+    def test_init_custom_params(self, temp_dir):
+        """Test initialization with custom parameters."""
+        agent = MediaAgent(
+            output_dir=str(temp_dir),
+            llm_model="custom/model",
+            image_mode="split",
+            offload_mode="sequential",
+            device="cpu",
+        )
+
+        assert agent.output_dir == temp_dir
+        assert agent.llm_model == "custom/model"
+        assert agent.image_mode == "split"
+        assert agent.offload_mode == "sequential"
+        assert agent.device == "cpu"
+
+    def test_init_creates_output_dir(self, temp_dir):
+        """Test that output directory is created."""
+        output_dir = temp_dir / "new_output"
+        agent = MediaAgent(output_dir=str(output_dir))
+
+        assert output_dir.exists()
+
+    def test_lazy_loading(self):
+        """Test that models are not loaded on init."""
+        agent = MediaAgent()
+
+        assert agent._llm is None
+        assert agent._generator is None
+
+
+class TestMediaAgentParsing:
+    """Tests for response parsing."""
+
+    def test_parse_generation_valid(self):
+        """Test parsing valid generation response."""
+        agent = MediaAgent()
+
+        response = """GENERATE_IMAGE
+prompt: A beautiful sunset
+negative_prompt: blurry
+resolution: 1024x1024
+seed: 42"""
+
+        result = agent._parse_generation(response)
+
+        assert result is not None
+        assert result["prompt"] == "A beautiful sunset"
+        assert result["negative_prompt"] == "blurry"
+        assert result["resolution"] == "1024x1024"
+        assert result["seed"] == 42
+
+    def test_parse_generation_minimal(self):
+        """Test parsing with only prompt."""
+        agent = MediaAgent()
+
+        response = """GENERATE_IMAGE
+prompt: Just a simple prompt
+negative_prompt: none
+resolution: none
+seed: none"""
+
+        result = agent._parse_generation(response)
+
+        assert result is not None
+        assert result["prompt"] == "Just a simple prompt"
+        assert "negative_prompt" not in result
+        assert "resolution" not in result
+        assert "seed" not in result
+
+    def test_parse_generation_no_match(self):
+        """Test parsing non-generation response."""
+        agent = MediaAgent()
+
+        response = "This is just a normal conversation response."
+
+        result = agent._parse_generation(response)
+
+        assert result is None
+
+    def test_parse_generation_no_prompt(self):
+        """Test parsing with missing prompt."""
+        agent = MediaAgent()
+
+        response = """GENERATE_IMAGE
+negative_prompt: blurry
+resolution: 1024x1024"""
+
+        result = agent._parse_generation(response)
+
+        assert result is None
+
+
+class TestMediaAgentSystemPrompt:
+    """Tests for system prompt."""
+
+    def test_system_prompt_content(self):
+        """Test system prompt contains required info."""
+        agent = MediaAgent()
+
+        prompt = agent._get_system_prompt()
+
+        assert "GENERATE_IMAGE" in prompt
+        assert "prompt:" in prompt
+        assert "negative_prompt:" in prompt
+        assert "resolution:" in prompt
+        assert "seed:" in prompt
+
+
+class TestMediaAgentGenerate:
+    """Tests for direct generation."""
+
+    def test_generate_direct(self, temp_dir):
+        """Test direct generation bypassing LLM."""
+        agent = MediaAgent(output_dir=str(temp_dir))
 
         # Mock the generator
         mock_image = MagicMock()
         mock_generator = MagicMock()
         mock_generator.generate.return_value = mock_image
+        agent._generator = mock_generator
 
-        with patch.object(tool, '_get_generator', return_value=mock_generator):
-            result = tool._run(prompt="A test image")
-
-            mock_generator.generate.assert_called_once()
-            mock_image.save.assert_called_once()
-            assert "generated_" in result
-            assert ".png" in result
-
-    def test_unload_clears_generator(self):
-        """Test that unload clears the generator."""
-        tool = ImageGenerationTool()
-        mock_generator = MagicMock()
-        tool._generator = mock_generator
-
-        tool.unload()
-
-        mock_generator.unload.assert_called_once()
-        assert tool._generator is None
-
-
-class TestOCRTool:
-    """Tests for OCRTool."""
-
-    def test_tool_name_and_description(self):
-        """Test tool has correct name and description."""
-        tool = OCRTool()
-        assert tool.name == "extract_text"
-        assert "extract" in tool.description.lower()
-        assert "text" in tool.description.lower()
-
-    def test_tool_args_schema(self):
-        """Test tool has correct args schema."""
-        tool = OCRTool()
-        assert tool.args_schema == OCRInput
-
-    def test_run_extracts_text(self, temp_dir):
-        """Test that tool extracts text from image."""
-        tool = OCRTool()
-
-        # Create a fake image file
-        image_path = temp_dir / "test.png"
-        image_path.touch()
-
-        # Mock the OCR
-        mock_ocr = MagicMock()
-        mock_ocr.extract.return_value = "Extracted text content"
-
-        with patch.object(tool, '_get_ocr', return_value=mock_ocr):
-            result = tool._run(image_path=str(image_path))
-
-            mock_ocr.extract.assert_called_once()
-            assert result == "Extracted text content"
-
-    def test_run_returns_error_for_missing_file(self):
-        """Test that tool returns error for missing file."""
-        tool = OCRTool()
-
-        result = tool._run(image_path="/nonexistent/file.png")
-
-        assert "Error" in result
-        assert "not found" in result
-
-    def test_unload_clears_ocr(self):
-        """Test that unload clears the OCR model."""
-        tool = OCRTool()
-        mock_ocr = MagicMock()
-        tool._ocr = mock_ocr
-
-        tool.unload()
-
-        mock_ocr.unload.assert_called_once()
-        assert tool._ocr is None
-
-
-class TestCreateTools:
-    """Tests for create_tools function."""
-
-    def test_creates_all_tools(self):
-        """Test that create_tools returns all tools."""
-        tools = create_tools()
-
-        assert len(tools) == 2
-        tool_names = [t.name for t in tools]
-        assert "generate_image" in tool_names
-        assert "extract_text" in tool_names
-
-    def test_custom_output_dir(self, temp_dir):
-        """Test that custom output dir is passed to image tool."""
-        tools = create_tools(output_dir=str(temp_dir))
-
-        image_tool = next(t for t in tools if t.name == "generate_image")
-        assert image_tool._output_dir == temp_dir
-
-
-class TestMediaAgent:
-    """Tests for MediaAgent."""
-
-    def test_agent_init(self):
-        """Test agent initialization."""
-        agent = MediaAgent(
-            model_name="test/model",
-            output_dir="test_output",
-            ocr_quantization="4bit",
+        result = agent.generate(
+            prompt="Test prompt",
+            negative_prompt="blurry",
+            resolution="1024x1024",
+            seed=42,
         )
 
-        assert agent.model_name == "test/model"
-        assert agent.output_dir == "test_output"
-        assert len(agent.tools) == 2
+        mock_generator.generate.assert_called_once_with(
+            prompt="Test prompt",
+            negative_prompt="blurry",
+            resolution="1024x1024",
+            seed=42,
+        )
+        mock_image.save.assert_called_once()
+        assert "generated_" in result
+        assert ".png" in result
 
-    def test_agent_has_tools(self):
-        """Test agent has correct tools."""
+
+class TestMediaAgentUnload:
+    """Tests for model unloading."""
+
+    def test_unload_clears_models(self):
+        """Test that unload clears all models."""
         agent = MediaAgent()
 
-        assert "generate_image" in agent.tool_map
-        assert "extract_text" in agent.tool_map
+        # Set mock models
+        mock_generator = MagicMock()
+        mock_llm = MagicMock()
+        agent._generator = mock_generator
+        agent._llm = mock_llm
 
-    def test_parse_tool_call_valid(self):
-        """Test parsing a valid tool call."""
+        agent.unload()
+
+        mock_generator.unload.assert_called_once()
+        mock_llm.unload.assert_called_once()
+        assert agent._generator is None
+        assert agent._llm is None
+
+    def test_unload_handles_none(self):
+        """Test that unload handles None models gracefully."""
         agent = MediaAgent()
 
-        response = """TOOL_CALL: generate_image
-ARGUMENTS:
-  prompt: A beautiful sunset
-  resolution: 1024x1024"""
+        # Should not raise
+        agent.unload()
 
-        result = agent._parse_tool_call(response)
+        assert agent._generator is None
+        assert agent._llm is None
 
-        assert result is not None
-        assert result["name"] == "generate_image"
-        assert result["arguments"]["prompt"] == "A beautiful sunset"
-        assert result["arguments"]["resolution"] == "1024x1024"
 
-    def test_parse_tool_call_with_seed(self):
-        """Test parsing tool call with integer argument."""
-        agent = MediaAgent()
-
-        response = """TOOL_CALL: generate_image
-ARGUMENTS:
-  prompt: Test image
-  seed: 42"""
-
-        result = agent._parse_tool_call(response)
-
-        assert result is not None
-        assert result["arguments"]["seed"] == 42  # Should be int
-
-    def test_parse_tool_call_no_tool(self):
-        """Test parsing response without tool call."""
-        agent = MediaAgent()
-
-        response = "This is just a normal response without any tool call."
-
-        result = agent._parse_tool_call(response)
-
-        assert result is None
-
-    def test_parse_tool_call_ocr(self):
-        """Test parsing OCR tool call."""
-        agent = MediaAgent()
-
-        response = """TOOL_CALL: extract_text
-ARGUMENTS:
-  image_path: document.png
-  mode: markdown"""
-
-        result = agent._parse_tool_call(response)
-
-        assert result is not None
-        assert result["name"] == "extract_text"
-        assert result["arguments"]["image_path"] == "document.png"
-        assert result["arguments"]["mode"] == "markdown"
-
-    def test_get_system_prompt(self):
-        """Test that system prompt contains tool information."""
-        agent = MediaAgent()
-
-        prompt = agent._get_system_prompt()
-
-        assert "generate_image" in prompt
-        assert "extract_text" in prompt
-        assert "TOOL_CALL" in prompt
+class TestMediaAgentContextManager:
+    """Tests for context manager."""
 
     def test_context_manager(self):
         """Test agent works as context manager."""
@@ -228,24 +202,13 @@ ARGUMENTS:
 
             mock_unload.assert_called_once()
 
-    def test_unload_clears_all(self):
-        """Test that unload clears all models."""
-        agent = MediaAgent()
+    def test_context_manager_on_exception(self):
+        """Test cleanup happens even on exception."""
+        with patch.object(MediaAgent, 'unload') as mock_unload:
+            try:
+                with MediaAgent() as agent:
+                    raise ValueError("Test error")
+            except ValueError:
+                pass
 
-        # Mock the tool internals
-        for tool in agent.tools:
-            if hasattr(tool, '_generator'):
-                tool._generator = MagicMock()
-            if hasattr(tool, '_ocr'):
-                tool._ocr = MagicMock()
-
-        agent._qwen = MagicMock()
-
-        agent.unload()
-
-        # Verify tools were cleared
-        for tool in agent.tools:
-            if hasattr(tool, '_generator'):
-                assert tool._generator is None
-            if hasattr(tool, '_ocr'):
-                assert tool._ocr is None
+            mock_unload.assert_called_once()

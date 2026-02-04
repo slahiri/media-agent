@@ -1,16 +1,14 @@
 # media-utils
 
-A Python library for media utilities including image generation, OCR, and LLM text generation.
+An AI agent for image generation using natural language. Powered by LangGraph, Qwen LLM, and Z-Image-Turbo.
 
 ## Features
 
-- **Image Generation**: Z-Image-Turbo (6B params) - photorealistic images with bilingual text rendering
-- **OCR**: DeepSeek-OCR-2 (3B params) - document and image text extraction with 97% accuracy
-- **LLM**: Qwen2.5-7B-Instruct for text generation and chat
-- **Memory Optimized**: CPU offloading and quantization for efficient GPU usage
-- **Configurable**: Support for multiple schedulers, resolutions, and quantization modes
-- **Unified Interface**: Consistent `load()`/`unload()` pattern across all models for agent orchestration
-- **Config-driven**: YAML configuration for models, paths, and generation defaults
+- **Natural Language Interface**: Just describe what you want - "Generate a sunset over mountains"
+- **LangGraph Agent**: LLM-powered decision making for intelligent image generation
+- **Z-Image-Turbo**: High-quality 6B parameter diffusion model
+- **Memory Optimized**: CPU offloading for efficient GPU usage
+- **Simple API**: One class, easy to use
 
 ## Setup
 
@@ -31,288 +29,138 @@ uv pip install -e .
 ### 3. Download models
 
 ```bash
-# Download all models (pipeline mode)
 python -m media_utils.utils.downloader all
-
-# Or download split files and copy to local models/ folder
-python -m media_utils.utils.downloader all split --local
 ```
 
-### 4. Run an example
+### 4. Run the agent
 
 ```bash
-python examples/test_pipeline.py
+python examples/test_agent.py
 ```
 
-### 5. Check the output
+## Usage
 
-Generated images are saved to the `output/` folder.
-
-## Quick Start
-
-### Generate Images
-
-```python
-from media_utils import ImageGenerator
-
-# Basic usage (with CPU offload for better GPU sharing)
-gen = ImageGenerator(mode="pipeline")
-
-# Generate an image
-image = gen.generate(
-    prompt="A serene mountain landscape at sunset",
-    seed=42,
-)
-image.save("output/image.png")
-
-# Free GPU memory when done
-gen.unload()
-```
-
-### Advanced Options
-
-```python
-gen = ImageGenerator(
-    mode="pipeline",
-    # Memory optimization
-    offload_mode="model",       # "none", "model" (recommended), "sequential"
-    enable_vae_slicing=True,    # Reduce VAE memory
-    keep_loaded=True,           # Keep model loaded for multiple generations
-    # Scheduler options
-    scheduler="dpmpp_sde_karras",  # Better quality
-    use_karras_sigmas=True,     # Better noise schedule
-)
-
-image = gen.generate(
-    prompt="A cyberpunk city at night",
-    negative_prompt="blurry, low quality",
-    resolution="1344x768",      # 16:9 landscape
-    num_inference_steps=8,      # 8-9 for Turbo
-    guidance_scale=1.0,         # 1.0 for Turbo models
-    seed=123,
-)
-```
-
-### Context Manager (Auto Cleanup)
-
-```python
-from media_utils import ImageGenerator
-
-with ImageGenerator() as gen:
-    image = gen.generate("A mountain landscape")
-    image.save("output/image.png")
-# Model automatically unloaded
-```
-
-### Use OCR
-
-```python
-from media_utils import DeepSeekOCR
-
-# Initialize with 4-bit quantization (~8GB VRAM)
-ocr = DeepSeekOCR(quantization="4bit")
-
-# Extract text from document
-text = ocr.extract(
-    "document.png",
-    mode="markdown",      # "markdown", "free", "figure", "describe"
-    resolution="gundam",  # Recommended for documents
-)
-print(text)
-
-# Free GPU memory
-ocr.unload()
-```
-
-### Use LLM
-
-```python
-from media_utils import QwenLLM
-
-llm = QwenLLM()
-
-# Text generation
-response = llm.generate("Explain quantum computing:")
-
-# Chat format
-response = llm.chat([
-    {"role": "system", "content": "You are a helpful assistant."},
-    {"role": "user", "content": "What is AI?"},
-])
-```
-
-### Use the Agent (LangGraph)
+### Natural Language (via LLM)
 
 ```python
 from media_utils import MediaAgent
 
-# Initialize the agent
-agent = MediaAgent(
-    output_dir="output",
-    ocr_quantization="4bit",
-)
+agent = MediaAgent()
 
-# Generate image via natural language
-result = agent.run("Create an image of a sunset over mountains")
-print(result)  # "Image generated and saved to: output/generated_20260204_123456.png"
+# The LLM interprets your request and generates appropriate images
+result = agent.run("Generate a sunset over mountains")
+print(result)  # "Image saved to: output/generated_xxx.png"
 
-# Extract text via natural language
-result = agent.run("Extract text from document.png")
-print(result)  # Extracted markdown text
+result = agent.run("Create a cyberpunk city at night with neon lights")
+print(result)
 
 # Cleanup
 agent.unload()
-
-# Or use context manager
-with MediaAgent() as agent:
-    result = agent.run("Generate a cyberpunk city at night")
 ```
 
-## Memory Optimization
+### Direct Generation (bypass LLM)
 
-Similar to ComfyUI, this library supports CPU offloading for efficient GPU usage:
+```python
+from media_utils import MediaAgent
 
-| Mode | VRAM Usage | Speed | Description |
-|------|------------|-------|-------------|
+agent = MediaAgent()
+
+# Generate directly without LLM interpretation
+path = agent.generate(
+    prompt="A serene Japanese garden with cherry blossoms",
+    negative_prompt="blurry, low quality",
+    resolution="1344x768",  # 16:9 landscape
+    seed=42,
+)
+print(f"Saved to: {path}")
+
+agent.unload()
+```
+
+### Context Manager (auto cleanup)
+
+```python
+from media_utils import MediaAgent
+
+with MediaAgent() as agent:
+    agent.run("Generate a forest landscape")
+    agent.run("Create an ocean sunset")
+# Models automatically unloaded
+```
+
+## Configuration
+
+```python
+agent = MediaAgent(
+    output_dir="output",           # Where to save images
+    llm_model="Qwen/Qwen2.5-7B-Instruct",  # LLM for reasoning
+    image_mode="pipeline",         # "pipeline", "split", or "local"
+    offload_mode="model",          # "none", "model", or "sequential"
+    device="cuda",                 # "cuda" or "cpu"
+)
+```
+
+### Memory Modes
+
+| Mode | VRAM | Speed | Description |
+|------|------|-------|-------------|
 | `"none"` | ~16GB | Fastest | Full model on GPU |
-| `"model"` | ~8-10GB | Good | Models move to GPU only when needed (default) |
+| `"model"` | ~8-10GB | Good | CPU offload when idle (default) |
 | `"sequential"` | ~4-6GB | Slowest | Maximum memory savings |
 
-## Model Lifecycle
+### Resolution Presets
 
-| `keep_loaded` | Behavior |
-|---------------|----------|
-| `True` (default) | Model stays loaded, call `unload()` manually |
-| `False` | Model unloads after each `generate()` call |
-
-## Schedulers
-
-Available schedulers for different quality/speed tradeoffs:
-
-| Scheduler | Best For | Steps |
-|-----------|----------|-------|
-| `flow_match_euler` | Default (Z-Image native) | 8 |
-| `euler` | Fast generation | 8 |
-| `euler_ancestral` | More diversity | 8 |
-| `dpmpp_sde_karras` | Better quality | 8-10 |
-| `dpmpp_2m_karras` | Balanced | 10-15 |
-| `ddim` | Deterministic | 20+ |
-| `unipc` | Fast convergence | 5-10 |
-
-```python
-# List all schedulers
-print(ImageGenerator.list_schedulers())
-
-# Change scheduler on the fly
-gen.set_scheduler("dpmpp_sde_karras")
-```
-
-## Generation Parameters
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `resolution` | "1024x1024" | Image size as preset, "WxH" string, or (w,h) tuple |
-| `num_inference_steps` | 8 | Denoising steps (8-9 for Turbo) |
-| `guidance_scale` | 1.0 | CFG scale (1.0 for Turbo) |
-| `negative_prompt` | None | What to avoid in the image |
-| `seed` | None | Random seed for reproducibility |
-
-**Resolution presets:**
-| Preset | Size | Aspect Ratio |
-|--------|------|--------------|
+| Resolution | Size | Aspect Ratio |
+|------------|------|--------------|
 | `"1024x1024"` | 1024×1024 | 1:1 (Square) |
-| `"1152x896"` | 1152×896 | 4:3 (Landscape) |
-| `"896x1152"` | 896×1152 | 3:4 (Portrait) |
 | `"1344x768"` | 1344×768 | 16:9 (Landscape) |
 | `"768x1344"` | 768×1344 | 9:16 (Portrait) |
+| `"1152x896"` | 1152×896 | 4:3 (Landscape) |
+| `"896x1152"` | 896×1152 | 3:4 (Portrait) |
 
-```python
-# Resolution options
-image = gen.generate(prompt, resolution="1344x768")       # Preset
-image = gen.generate(prompt, resolution="800x600")        # Custom "WxH"
-image = gen.generate(prompt, resolution=(1280, 720))      # Tuple
-image = gen.generate(prompt, width=1024, height=768)      # Individual params
-```
-
-## Models
-
-### Z-Image-Turbo (Image Generation)
-
-| Component | File | Size |
-|-----------|------|------|
-| Text Encoder | `qwen_3_4b.safetensors` | ~8GB |
-| Diffusion Model | `z_image_turbo_bf16.safetensors` | ~12GB |
-| VAE | `ae.safetensors` | ~335MB |
-
-**Sources:**
-- Pipeline: `Tongyi-MAI/Z-Image-Turbo`
-- Split files: `Comfy-Org/z_image_turbo`
-
-### DeepSeek-OCR (Text Extraction)
-
-- Model: `deepseek-ai/DeepSeek-OCR-2` (3B params)
-- Modes: `markdown`, `free`, `figure`, `describe`
-- Resolutions: `tiny`, `small`, `base`, `large`, `gundam` (recommended)
-
-| Quantization | VRAM | Quality |
-|--------------|------|---------|
-| None (full)  | ~16GB | Best |
-| `"8bit"`     | ~10-12GB | Good |
-| `"4bit"`     | ~8GB | Acceptable |
-
-### Qwen LLM
-
-- Default: `Qwen/Qwen2.5-7B-Instruct`
-- Alternatives: `Qwen2.5-3B-Instruct` (smaller), `Qwen2.5-14B-Instruct` (larger)
-
-## Project Structure
+## How It Works
 
 ```
-media-utils/
-├── config.yaml              # Model configurations
-├── pyproject.toml           # Package dependencies
-├── output/                  # Generated images and OCR results
-├── models/                  # Local models folder
-│   ├── text_encoders/
-│   ├── diffusion_models/
-│   ├── vae/
-│   └── llm/
-├── media_utils/
-│   ├── config.py            # Config loader
-│   ├── image/
-│   │   └── generator.py     # ImageGenerator class
-│   ├── ocr/
-│   │   └── deepseek.py      # DeepSeekOCR class
-│   ├── llm/
-│   │   └── qwen.py          # QwenLLM class
-│   ├── agent/
-│   │   ├── graph.py         # MediaAgent (LangGraph)
-│   │   └── tools.py         # LangChain tools
-│   └── utils/
-│       └── downloader.py    # Model download utilities
-├── examples/
-│   ├── test_pipeline.py     # Test image generation (pipeline)
-│   ├── test_split.py        # Test image generation (split files)
-│   ├── test_ocr.py          # Test OCR
-│   ├── test_qwen.py         # Test LLM
-│   ├── test_agent.py        # Test agent
-│   └── usage.py             # Full examples
-└── tests/                   # Unit tests
+User: "Create a sunset over mountains"
+           │
+           ▼
+    ┌─────────────┐
+    │  Qwen LLM   │  Interprets request, creates detailed prompt
+    └──────┬──────┘
+           │
+           ▼
+    ┌─────────────┐
+    │  Z-Image    │  Generates high-quality image
+    │   Turbo     │
+    └──────┬──────┘
+           │
+           ▼
+    output/generated_xxx.png
 ```
+
+The agent uses Qwen to:
+1. Understand your natural language request
+2. Create a detailed, optimized prompt for image generation
+3. Choose appropriate settings (resolution, negative prompts)
+4. Execute the generation
 
 ## CLI Commands
 
 ```bash
-# List available models
-python -m media_utils.utils.downloader list
+# Download models
+python -m media_utils.utils.downloader all
 
-# Download all models (image, LLM, OCR)
-python -m media_utils.utils.downloader all [pipeline|split] [--local]
+# Run interactive agent
+python examples/test_agent.py
 
-# Download individual models
-python -m media_utils.utils.downloader image [pipeline|split] [--local]
-python -m media_utils.utils.downloader llm [--local]
-python -m media_utils.utils.downloader ocr
+# Run single generation
+python examples/test_agent.py single
+
+# Run direct generation (bypass LLM)
+python examples/test_agent.py direct
+
+# Run batch generation
+python examples/test_agent.py batch
 ```
 
 ## Requirements

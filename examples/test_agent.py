@@ -4,23 +4,21 @@
 from media_utils import MediaAgent
 
 
-def main():
-    """Run the media agent interactively."""
+def interactive_mode():
+    """Run the agent interactively."""
     print("=" * 50)
-    print("Media Agent - Image Generation & OCR")
+    print("Media Agent - AI Image Generation")
     print("=" * 50)
     print()
-    print("Commands:")
-    print("  - Generate images: 'Create an image of a sunset'")
-    print("  - OCR: 'Extract text from document.png'")
-    print("  - Type 'quit' to exit")
+    print("Examples:")
+    print("  - 'Generate a sunset over mountains'")
+    print("  - 'Create a cyberpunk city at night'")
+    print("  - 'Draw a cat sitting on a beach'")
+    print()
+    print("Type 'quit' to exit")
     print()
 
-    # Initialize the agent
-    agent = MediaAgent(
-        output_dir="output",
-        ocr_quantization="4bit",
-    )
+    agent = MediaAgent()
 
     try:
         while True:
@@ -34,45 +32,51 @@ def main():
                 break
 
             print("\nAgent: ", end="", flush=True)
-            response = agent.run(query)
-            print(response)
+            result = agent.run(query)
+            print(result)
 
     finally:
-        # Cleanup
         agent.unload()
-        print("\nModels unloaded.")
 
 
-def example_generate_image():
-    """Example: Generate an image."""
+def example_single():
+    """Generate a single image."""
     print("Generating image...")
 
     with MediaAgent() as agent:
-        result = agent.run("Generate a photorealistic image of a mountain landscape at sunset with a lake reflection")
+        result = agent.run("Generate a photorealistic mountain landscape at sunset with a lake reflection")
         print(result)
 
 
-def example_ocr():
-    """Example: Extract text from an image."""
-    print("Extracting text...")
+def example_direct():
+    """Generate using direct API (bypassing LLM)."""
+    print("Generating image directly...")
 
     with MediaAgent() as agent:
-        result = agent.run("Extract the text from output/test_document.png using markdown mode")
-        print(result)
+        path = agent.generate(
+            prompt="A futuristic city with flying cars and neon lights",
+            negative_prompt="blurry, low quality",
+            resolution="1344x768",
+            seed=42,
+        )
+        print(f"Image saved to: {path}")
 
 
-def example_workflow():
-    """Example: Multi-step workflow."""
-    print("Running multi-step workflow...")
+def example_batch():
+    """Generate multiple images."""
+    print("Generating multiple images...")
+
+    prompts = [
+        "A serene Japanese garden with cherry blossoms",
+        "A dramatic thunderstorm over the ocean",
+        "A cozy cabin in a snowy forest",
+    ]
 
     with MediaAgent() as agent:
-        # Generate an image
-        print("\n1. Generating image...")
-        result1 = agent.run("Create an image of a handwritten note that says 'Hello World'")
-        print(result1)
-
-        # Note: In a real scenario, you would then use OCR on the generated image
-        # This is just a demonstration of the agent's capabilities
+        for prompt in prompts:
+            print(f"\nGenerating: {prompt[:40]}...")
+            path = agent.generate(prompt)
+            print(f"Saved to: {path}")
 
 
 if __name__ == "__main__":
@@ -80,14 +84,15 @@ if __name__ == "__main__":
 
     if len(sys.argv) > 1:
         cmd = sys.argv[1]
-        if cmd == "generate":
-            example_generate_image()
-        elif cmd == "ocr":
-            example_ocr()
-        elif cmd == "workflow":
-            example_workflow()
+        if cmd == "single":
+            example_single()
+        elif cmd == "direct":
+            example_direct()
+        elif cmd == "batch":
+            example_batch()
         else:
             print(f"Unknown command: {cmd}")
-            print("Usage: python test_agent.py [generate|ocr|workflow]")
+            print("Usage: python test_agent.py [single|direct|batch]")
+            print("       python test_agent.py  # interactive mode")
     else:
-        main()
+        interactive_mode()

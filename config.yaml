@@ -50,16 +50,6 @@ models:
     device: "cuda"
     max_new_tokens: 512
 
-  ocr:
-    # DeepSeek-OCR model
-    name: "deepseek-ai/DeepSeek-OCR-2"
-    torch_dtype: "bfloat16"
-    device: "cuda"
-    # Quantization options: null (full ~16GB), "8bit" (~10GB), "4bit" (~8GB)
-    quantization: "4bit"
-    # Default resolution preset: tiny, small, base, large, gundam
-    default_resolution: "gundam"
-
 paths:
   # HuggingFace cache directory
   cache_dir: "~/.cache/media_utils"
