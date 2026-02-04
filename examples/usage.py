@@ -17,8 +17,8 @@ def example_image_generation_pipeline():
     )
 
     # Save the image
-    image.save("generated_pipeline.png")
-    print("Image saved to: generated_pipeline.png")
+    image.save("output/generated_pipeline.png")
+    print("Image saved to: output/generated_pipeline.png")
 
 
 def example_image_generation_local():
@@ -36,8 +36,8 @@ def example_image_generation_local():
     )
 
     # Save the image
-    image.save("generated_local.png")
-    print("Image saved to: generated_local.png")
+    image.save("output/generated_local.png")
+    print("Image saved to: output/generated_local.png")
 
 
 def example_llm_generate():

@@ -43,6 +43,10 @@ env/
 *~
 
 # Generated images
+output/*.png
+output/*.jpg
+output/*.jpeg
+!output/.gitkeep
 *.png
 *.jpg
 *.jpeg
