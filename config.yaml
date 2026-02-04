@@ -27,7 +27,19 @@ models:
     default_steps: 8
     default_size: [1024, 1024]
     guidance_scale: 1.0
-    sampler: "euler_ancestral"
+
+    # Scheduler options:
+    #   flow_match_euler (default), euler, euler_ancestral,
+    #   dpmpp_2m, dpmpp_2m_karras, dpmpp_sde, dpmpp_sde_karras,
+    #   ddim, unipc
+    # scheduler: "flow_match_euler"
+    # use_karras_sigmas: false  # Better noise schedule
+    # use_beta_sigmas: false    # Alternative noise schedule
+
+    # Memory optimization (similar to ComfyUI)
+    # offload_mode: "model"  # "none", "model" (recommended), or "sequential"
+    # enable_vae_slicing: true  # Reduces VAE memory usage
+    # enable_vae_tiling: false  # For very large images
 
   llm:
     # HuggingFace model
