@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "media-agent"
-version = "0.3.0"
+version = "0.3.1"
 description = "AI agent for image generation with multi-provider LLM support and interactive CLI"
 readme = "README.md"
 license = {text = "MIT"}
