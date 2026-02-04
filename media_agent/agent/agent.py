@@ -1,32 +1,44 @@
 """LangGraph agent for image generation."""
 
-from typing import Annotated, Optional, Literal, TypedDict, Sequence
-from pathlib import Path
 from datetime import datetime
 import operator
+from pathlib import Path
+from typing import Annotated, Literal, Sequence, TypedDict
 
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, ToolMessage
-from langgraph.graph import StateGraph, END
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
+from langgraph.graph import END, StateGraph
+
+from media_agent.image.generator import ImageGenerator
+from media_agent.image.nanobanana import NanobananaGenerator
+from media_agent.llm import get_llm, get_settings
+from media_agent.llm.base import BaseLLM
+from media_agent.tools.image_tool import get_tool_definitions
 
 
 class AgentState(TypedDict):
     """State for the media agent."""
+
     messages: Annotated[Sequence[BaseMessage], operator.add]
 
 
 class MediaAgent:
     """LangGraph agent for AI-powered image generation.
 
-    Uses Qwen LLM for reasoning and Z-Image-Turbo for image generation.
+    Uses configurable LLM providers (OpenAI, Anthropic, Ollama, HuggingFace)
+    for reasoning and Z-Image-Turbo or Nanobanana for image generation.
     The agent interprets natural language requests and generates images.
 
     Example:
         >>> from media_agent import MediaAgent
         >>>
-        >>> # Basic usage
+        >>> # Basic usage (uses configured provider)
         >>> agent = MediaAgent()
         >>> result = agent.run("Generate an image of a sunset over mountains")
         >>> print(result)  # "Image saved to: output/generated_xxx.png"
+        >>>
+        >>> # Specify providers
+        >>> agent = MediaAgent(llm_provider="openai", llm_model="gpt-4o")
+        >>> agent = MediaAgent(image_provider="nanobanana")
         >>>
         >>> # Multiple generations
         >>> agent.run("Create a cyberpunk city at night")
@@ -43,7 +55,9 @@ class MediaAgent:
     def __init__(
         self,
         output_dir: str = "output",
-        llm_model: str = "Qwen/Qwen2.5-7B-Instruct",
+        llm_provider: str | None = None,
+        llm_model: str | None = None,
+        image_provider: str | None = None,
         image_mode: str = "pipeline",
         offload_mode: str = "model",
         device: str = "cuda",
@@ -52,48 +66,73 @@ class MediaAgent:
 
         Args:
             output_dir: Directory for generated images.
-            llm_model: Qwen model name for reasoning.
-            image_mode: Image model mode ("pipeline", "split", "local").
+            llm_provider: LLM provider ("openai", "anthropic", "ollama", "huggingface").
+                         Uses settings if not specified.
+            llm_model: LLM model name. Uses provider default if not specified.
+            image_provider: Image provider ("local", "nanobanana").
+                           Uses settings if not specified.
+            image_mode: Image model mode ("pipeline", "split", "local") for local provider.
             offload_mode: GPU memory mode ("none", "model", "sequential").
             device: Device for models ("cuda" or "cpu").
         """
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
+        self.llm_provider = llm_provider
         self.llm_model = llm_model
+        self.image_provider = image_provider
         self.image_mode = image_mode
         self.offload_mode = offload_mode
         self.device = device
 
+        # Settings
+        self.settings = get_settings()
+
         # Lazy-loaded models
-        self._llm = None
-        self._generator = None
+        self._llm: BaseLLM | None = None
+        self._generator: ImageGenerator | NanobananaGenerator | None = None
         self._graph = None
 
     @property
-    def llm(self):
+    def llm(self) -> BaseLLM:
         """Lazy-load the LLM."""
         if self._llm is None:
-            from media_agent.llm.qwen import QwenLLM
-            print(f"Loading LLM: {self.llm_model}")
-            self._llm = QwenLLM(
-                model_name=self.llm_model,
+            print(f"Loading LLM: provider={self.llm_provider or 'default'}")
+            self._llm = get_llm(
+                provider=self.llm_provider,
+                model=self.llm_model,
                 device=self.device,
             )
         return self._llm
 
     @property
-    def generator(self):
+    def generator(self) -> ImageGenerator | NanobananaGenerator:
         """Lazy-load the image generator."""
         if self._generator is None:
-            from media_agent.image.generator import ImageGenerator
-            print(f"Loading ImageGenerator: mode={self.image_mode}")
-            self._generator = ImageGenerator(
-                mode=self.image_mode,
-                offload_mode=self.offload_mode,
-                device=self.device,
-                keep_loaded=True,
-            )
+            provider = self.image_provider or self.settings.get("image.provider", "local")
+
+            if provider == "nanobanana":
+                api_key = self.settings.get("nanobanana.api_key")
+                if not api_key:
+                    raise ValueError(
+                        "Nanobanana API key not set. "
+                        "Use: /settings nanobanana.api_key <key>"
+                    )
+                print("Loading NanobananaGenerator")
+                self._generator = NanobananaGenerator(
+                    api_key=api_key,
+                    base_url=self.settings.get("nanobanana.base_url"),
+                    output_dir=self.output_dir,
+                )
+            else:
+                mode = self.settings.get("image.mode", self.image_mode)
+                print(f"Loading ImageGenerator: mode={mode}")
+                self._generator = ImageGenerator(
+                    mode=mode,
+                    offload_mode=self.offload_mode,
+                    device=self.device,
+                    keep_loaded=True,
+                )
         return self._generator
 
     def _build_graph(self):
@@ -114,7 +153,7 @@ class MediaAgent:
             {
                 "generate": "generate",
                 "end": END,
-            }
+            },
         )
         workflow.add_edge("generate", "agent")
 
@@ -136,18 +175,39 @@ class MediaAgent:
             elif isinstance(msg, ToolMessage):
                 chat_messages.append({"role": "user", "content": f"Result: {msg.content}"})
 
-        # Get LLM response
-        response = self.llm.chat(chat_messages)
+        # Check if LLM supports tools
+        if self.llm.supports_tools():
+            tools = get_tool_definitions()
+            response = self.llm.chat_with_tools(chat_messages, tools)
 
-        # Parse for generation request
-        gen_params = self._parse_generation(response)
+            # Handle tool calls
+            if response.has_tool_calls:
+                for tool_call in response.tool_calls:
+                    if tool_call.name == "generate_image":
+                        return {
+                            "messages": [
+                                AIMessage(
+                                    content=response.content or "Generating image...",
+                                    additional_kwargs={"generation": tool_call.arguments},
+                                )
+                            ]
+                        }
 
-        return {
-            "messages": [AIMessage(
-                content=response,
-                additional_kwargs={"generation": gen_params} if gen_params else {}
-            )]
-        }
+            return {"messages": [AIMessage(content=response.content)]}
+
+        else:
+            # Fallback to structured output parsing
+            response = self.llm.chat(chat_messages)
+            gen_params = self._parse_generation(response)
+
+            return {
+                "messages": [
+                    AIMessage(
+                        content=response,
+                        additional_kwargs={"generation": gen_params} if gen_params else {},
+                    )
+                ]
+            }
 
     def _generate_node(self, state: AgentState) -> dict:
         """Generate node - creates the image."""
@@ -191,6 +251,18 @@ class MediaAgent:
 
     def _get_system_prompt(self) -> str:
         """System prompt for the agent."""
+        if self.llm.supports_tools():
+            return """You are MediaAgent, an AI assistant specialized in image generation.
+You help users create images by understanding their requests and generating appropriate images.
+
+When the user asks you to generate an image, use the generate_image tool with:
+- A detailed, descriptive prompt
+- An appropriate resolution based on the content
+- Optional negative prompt for things to avoid
+
+Be creative and helpful. If the user's request is vague, ask clarifying questions."""
+
+        # Fallback for non-tool-calling LLMs
         return """You are an AI assistant that generates images from text descriptions.
 
 When the user asks you to generate, create, draw, or make an image, respond with EXACTLY this format:
@@ -222,7 +294,7 @@ seed: none
 If the user is NOT asking for image generation, just respond conversationally.
 If you just generated an image, summarize what you created."""
 
-    def _parse_generation(self, response: str) -> Optional[dict]:
+    def _parse_generation(self, response: str) -> dict | None:
         """Parse generation parameters from LLM response."""
         if "GENERATE_IMAGE" not in response:
             return None
@@ -279,9 +351,9 @@ If you just generated an image, summarize what you created."""
     def generate(
         self,
         prompt: str,
-        negative_prompt: Optional[str] = None,
+        negative_prompt: str | None = None,
         resolution: str = "1024x1024",
-        seed: Optional[int] = None,
+        seed: int | None = None,
     ) -> str:
         """Generate an image directly (bypassing LLM).
 

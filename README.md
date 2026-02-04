@@ -1,157 +1,177 @@
-# media-utils
+# MediaAgent
 
-An AI agent for image generation using natural language. Powered by LangGraph, Qwen LLM, and Z-Image-Turbo.
+AI-powered image generation with natural language. Features an interactive CLI with multiple LLM providers and image backends.
 
-## Features
+## Quick Start
 
-- **Natural Language Interface**: Just describe what you want - "Generate a sunset over mountains"
-- **LangGraph Agent**: LLM-powered decision making for intelligent image generation
-- **Z-Image-Turbo**: High-quality 6B parameter diffusion model
-- **Memory Optimized**: CPU offloading for efficient GPU usage
-- **Simple API**: One class, easy to use
+```bash
+# Install
+pip install -e .
+
+# Start the CLI
+media-agent
+```
 
 ## Setup
 
-### 1. Create and activate virtual environment
+### 1. Install
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate  # Linux/Mac
-# .venv\Scripts\activate   # Windows
+source .venv/bin/activate
+
+# Basic install
+pip install -e .
+
+# With cloud LLM providers (recommended)
+pip install -e ".[all-llm]"
 ```
 
-### 2. Install dependencies
+### 2. Configure an LLM Provider
+
+Choose one:
+
+**OpenAI** (easiest)
+```
+/settings openai.api_key sk-your-key-here
+/llm openai
+```
+
+**Anthropic**
+```
+/settings anthropic.api_key sk-ant-your-key-here
+/llm anthropic
+```
+
+**Ollama** (free, local)
+```bash
+# Install Ollama first: https://ollama.ai
+ollama pull llama3.2
+ollama serve
+```
+```
+/llm ollama llama3.2
+```
+
+**Local HuggingFace** (requires GPU)
+```bash
+media-agent download llm
+```
+```
+/llm huggingface
+```
+
+### 3. Configure Image Generation
+
+**Local GPU** (default, requires CUDA GPU)
+```bash
+media-agent download image
+```
+```
+/image local
+```
+
+**Nanobanana Cloud** (no GPU needed)
+```
+/settings nanobanana.api_key your-key-here
+/image nanobanana
+```
+
+### 4. Generate Images
+
+Just chat naturally:
+```
+> Generate a sunset over mountains
+> Create a cyberpunk city at night
+> A cat wearing a tiny hat
+```
+
+Or use the direct command:
+```
+/generate a beautiful forest landscape
+```
+
+## CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `/help` | Show all commands |
+| `/generate <prompt>` | Generate an image |
+| `/llm <provider>` | Switch LLM (openai, anthropic, ollama, huggingface) |
+| `/image <provider>` | Switch image backend (local, nanobanana) |
+| `/settings <key> <value>` | Configure settings |
+| `/resolutions` | Show available image sizes |
+| `/unload` | Free GPU memory |
+| `/clear` | Clear chat history |
+| `/quit` | Exit |
+
+## Command Line Usage
 
 ```bash
-uv pip install -e .
+# Interactive mode
+media-agent
+
+# Generate directly
+media-agent generate "a sunset over mountains"
+
+# With options
+media-agent generate "a cat" -r 1024x1024 -s 42
+
+# Download models
+media-agent download all
+
+# Manage settings
+media-agent settings list
+media-agent settings openai.api_key sk-xxx
 ```
 
-### 3. Download models
-
-```bash
-python -m media_agent.tools.downloader all
-```
-
-### 4. Run the agent
-
-```bash
-python examples/example.py
-```
-
-## Usage
-
-### Natural Language (via LLM)
+## Python API
 
 ```python
 from media_agent import MediaAgent
 
+# Using configured settings
 agent = MediaAgent()
-
-# The LLM interprets your request and generates appropriate images
 result = agent.run("Generate a sunset over mountains")
-print(result)  # "Image saved to: output/generated_xxx.png"
-
-result = agent.run("Create a cyberpunk city at night with neon lights")
 print(result)
+
+# Specify providers
+agent = MediaAgent(
+    llm_provider="openai",
+    llm_model="gpt-4o",
+    image_provider="local",
+)
+
+# Direct generation (skip LLM)
+path = agent.generate(
+    prompt="A serene Japanese garden",
+    resolution="1344x768",
+    seed=42,
+)
 
 # Cleanup
 agent.unload()
 ```
 
-### Direct Generation (bypass LLM)
+## Image Resolutions
 
-```python
-from media_agent import MediaAgent
+| Name | Size | Best For |
+|------|------|----------|
+| `1024x1024` | Square | Balanced compositions |
+| `1344x768` | 16:9 | Landscapes, wide scenes |
+| `768x1344` | 9:16 | Portraits, tall subjects |
+| `1152x896` | 4:3 | Slight landscape |
+| `896x1152` | 3:4 | Slight portrait |
 
-agent = MediaAgent()
+## Settings Location
 
-# Generate directly without LLM interpretation
-path = agent.generate(
-    prompt="A serene Japanese garden with cherry blossoms",
-    negative_prompt="blurry, low quality",
-    resolution="1344x768",  # 16:9 landscape
-    seed=42,
-)
-print(f"Saved to: {path}")
-
-agent.unload()
-```
-
-### Context Manager (auto cleanup)
-
-```python
-from media_agent import MediaAgent
-
-with MediaAgent() as agent:
-    agent.run("Generate a forest landscape")
-    agent.run("Create an ocean sunset")
-# Models automatically unloaded
-```
-
-## Configuration
-
-```python
-agent = MediaAgent(
-    output_dir="output",           # Where to save images
-    llm_model="Qwen/Qwen2.5-7B-Instruct",  # LLM for reasoning
-    image_mode="pipeline",         # "pipeline", "split", or "local"
-    offload_mode="model",          # "none", "model", or "sequential"
-    device="cuda",                 # "cuda" or "cpu"
-)
-```
-
-### Memory Modes
-
-| Mode | VRAM | Speed | Description |
-|------|------|-------|-------------|
-| `"none"` | ~16GB | Fastest | Full model on GPU |
-| `"model"` | ~8-10GB | Good | CPU offload when idle (default) |
-| `"sequential"` | ~4-6GB | Slowest | Maximum memory savings |
-
-### Resolution Presets
-
-| Resolution | Size | Aspect Ratio |
-|------------|------|--------------|
-| `"1024x1024"` | 1024×1024 | 1:1 (Square) |
-| `"1344x768"` | 1344×768 | 16:9 (Landscape) |
-| `"768x1344"` | 768×1344 | 9:16 (Portrait) |
-| `"1152x896"` | 1152×896 | 4:3 (Landscape) |
-| `"896x1152"` | 896×1152 | 3:4 (Portrait) |
-
-## How It Works
-
-```
-User: "Create a sunset over mountains"
-           │
-           ▼
-    ┌─────────────┐
-    │  Qwen LLM   │  Interprets request, creates detailed prompt
-    └──────┬──────┘
-           │
-           ▼
-    ┌─────────────┐
-    │  Z-Image    │  Generates high-quality image
-    │   Turbo     │
-    └──────┬──────┘
-           │
-           ▼
-    output/generated_xxx.png
-```
-
-The agent uses Qwen to:
-1. Understand your natural language request
-2. Create a detailed, optimized prompt for image generation
-3. Choose appropriate settings (resolution, negative prompts)
-4. Execute the generation
+Settings are stored in `~/.config/media_agent/settings.json`. No environment variables needed.
 
 ## Requirements
 
 - Python >= 3.10
-- CUDA-capable GPU (16GB+ VRAM recommended, 8GB with offloading)
-- PyTorch >= 2.0
-- uv (for fast package installation)[^1]
-
-[^1]: To install uv, see: https://docs.astral.sh/uv/getting-started/installation/
+- For local image generation: CUDA GPU with 8GB+ VRAM
+- For cloud providers: API key only
 
 ## License
 
