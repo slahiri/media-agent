@@ -1,14 +1,15 @@
 # media-utils
 
-A Python library for media utilities including image generation using Z-Image-Turbo and LLM text generation using Qwen.
+A Python library for media utilities including image generation, OCR, and LLM text generation.
 
 ## Features
 
 - **Image Generation**: Z-Image-Turbo (6B params) - photorealistic images with bilingual text rendering
+- **OCR**: DeepSeek-OCR-2 (3B params) - document and image text extraction with 97% accuracy
 - **LLM**: Qwen2.5-7B-Instruct for text generation and chat
-- **Memory Optimized**: ComfyUI-style CPU offloading for efficient GPU usage
-- **Configurable Schedulers**: Support for multiple samplers and noise schedules
-- **Flexible Loading**: HuggingFace pipeline, split files (ComfyUI-style), or local models
+- **Memory Optimized**: CPU offloading and quantization for efficient GPU usage
+- **Configurable**: Support for multiple schedulers, resolutions, and quantization modes
+- **Unified Interface**: Consistent `load()`/`unload()` pattern across all models for agent orchestration
 - **Config-driven**: YAML configuration for models, paths, and generation defaults
 
 ## Setup
@@ -101,6 +102,26 @@ with ImageGenerator() as gen:
     image = gen.generate("A mountain landscape")
     image.save("output/image.png")
 # Model automatically unloaded
+```
+
+### Use OCR
+
+```python
+from media_utils import DeepSeekOCR
+
+# Initialize with 4-bit quantization (~8GB VRAM)
+ocr = DeepSeekOCR(quantization="4bit")
+
+# Extract text from document
+text = ocr.extract(
+    "document.png",
+    mode="markdown",      # "markdown", "free", "figure", "describe"
+    resolution="gundam",  # Recommended for documents
+)
+print(text)
+
+# Free GPU memory
+ocr.unload()
 ```
 
 ### Use LLM
@@ -200,6 +221,18 @@ image = gen.generate(prompt, width=1024, height=768)      # Individual params
 - Pipeline: `Tongyi-MAI/Z-Image-Turbo`
 - Split files: `Comfy-Org/z_image_turbo`
 
+### DeepSeek-OCR (Text Extraction)
+
+- Model: `deepseek-ai/DeepSeek-OCR-2` (3B params)
+- Modes: `markdown`, `free`, `figure`, `describe`
+- Resolutions: `tiny`, `small`, `base`, `large`, `gundam` (recommended)
+
+| Quantization | VRAM | Quality |
+|--------------|------|---------|
+| None (full)  | ~16GB | Best |
+| `"8bit"`     | ~10-12GB | Good |
+| `"4bit"`     | ~8GB | Acceptable |
+
 ### Qwen LLM
 
 - Default: `Qwen/Qwen2.5-7B-Instruct`
@@ -211,7 +244,7 @@ image = gen.generate(prompt, width=1024, height=768)      # Individual params
 media-utils/
 ├── config.yaml              # Model configurations
 ├── pyproject.toml           # Package dependencies
-├── output/                  # Generated images
+├── output/                  # Generated images and OCR results
 ├── models/                  # Local models folder
 │   ├── text_encoders/
 │   ├── diffusion_models/
@@ -221,13 +254,16 @@ media-utils/
 │   ├── config.py            # Config loader
 │   ├── image/
 │   │   └── generator.py     # ImageGenerator class
+│   ├── ocr/
+│   │   └── deepseek.py      # DeepSeekOCR class
 │   ├── llm/
 │   │   └── qwen.py          # QwenLLM class
 │   └── utils/
 │       └── downloader.py    # Model download utilities
 ├── examples/
-│   ├── test_pipeline.py     # Test pipeline mode
-│   ├── test_split.py        # Test split files mode
+│   ├── test_pipeline.py     # Test image generation (pipeline)
+│   ├── test_split.py        # Test image generation (split files)
+│   ├── test_ocr.py          # Test OCR
 │   ├── test_qwen.py         # Test LLM
 │   └── usage.py             # Full examples
 └── tests/                   # Unit tests
@@ -239,14 +275,13 @@ media-utils/
 # List available models
 python -m media_utils.utils.downloader list
 
-# Download all models
+# Download all models (image, LLM, OCR)
 python -m media_utils.utils.downloader all [pipeline|split] [--local]
 
-# Download image model only
+# Download individual models
 python -m media_utils.utils.downloader image [pipeline|split] [--local]
-
-# Download LLM only
 python -m media_utils.utils.downloader llm [--local]
+python -m media_utils.utils.downloader ocr
 ```
 
 ## Requirements

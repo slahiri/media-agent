@@ -152,15 +152,16 @@ class TestDownloadLLMModel:
 class TestDownloadModels:
     """Tests for download_models function."""
 
-    def test_download_models_downloads_both(self, sample_config, mock_huggingface_hub):
-        """Test that download_models downloads both image and LLM models."""
+    def test_download_models_downloads_all(self, sample_config, mock_huggingface_hub):
+        """Test that download_models downloads image, LLM, and OCR models."""
         with patch("media_utils.utils.downloader.snapshot_download", mock_huggingface_hub["snapshot_download"]):
             result = download_models(sample_config, image_mode="pipeline")
 
             assert "image" in result
             assert "llm" in result
-            # Called twice: once for image, once for LLM
-            assert mock_huggingface_hub["snapshot_download"].call_count == 2
+            assert "ocr" in result
+            # Called three times: image, LLM, OCR
+            assert mock_huggingface_hub["snapshot_download"].call_count == 3
 
     def test_download_models_split_mode(self, sample_config, mock_huggingface_hub):
         """Test download_models with split mode for image."""
@@ -170,6 +171,7 @@ class TestDownloadModels:
 
             assert isinstance(result["image"], dict)  # Split returns dict
             assert isinstance(result["llm"], str)  # LLM returns path string
+            assert isinstance(result["ocr"], str)  # OCR returns path string
 
 
 class TestListAvailableModels:
@@ -182,5 +184,6 @@ class TestListAvailableModels:
         captured = capsys.readouterr()
         assert "Z-Image-Turbo" in captured.out
         assert "Qwen" in captured.out
+        assert "DeepSeek-OCR" in captured.out
         assert "Pipeline Mode" in captured.out
         assert "Split Files Mode" in captured.out

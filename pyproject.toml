@@ -5,11 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "media-utils"
 version = "0.1.0"
-description = "Media utilities: Image generation with Z-Image-Turbo and LLM with Qwen"
+description = "Media utilities: Image generation, OCR, and LLM"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.10"
-keywords = ["image-generation", "z-image", "qwen", "llm", "diffusion", "ai", "media"]
+keywords = ["image-generation", "z-image", "qwen", "llm", "ocr", "deepseek", "diffusion", "ai", "media"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -26,6 +26,8 @@ dependencies = [
     "transformers>=4.40.0",
     "huggingface_hub>=0.20.0",
     "accelerate>=0.25.0",
+    "bitsandbytes>=0.41.0",
+    "einops>=0.7.0",
     "pyyaml>=6.0",
     "pillow>=10.0.0",
 ]

@@ -240,10 +240,44 @@ def download_llm_model(
     return path
 
 
+def download_ocr_model(
+    config_path: str | Path | None = None,
+    model_name: str | None = None,
+) -> str:
+    """Download the DeepSeek-OCR model.
+
+    Args:
+        config_path: Path to config file.
+        model_name: Override model name from config.
+
+    Returns:
+        Path to downloaded model.
+    """
+    config = load_config(config_path)
+    ocr_config = config.get("models", {}).get("ocr", {})
+    model_name = model_name or ocr_config.get("name", "deepseek-ai/DeepSeek-OCR-2")
+    cache_dir = config.get("paths", {}).get("cache_dir")
+
+    if cache_dir:
+        cache_dir = os.path.expanduser(cache_dir)
+        os.makedirs(cache_dir, exist_ok=True)
+
+    print(f"Downloading OCR model: {model_name}")
+
+    path = snapshot_download(
+        repo_id=model_name,
+        cache_dir=cache_dir,
+    )
+
+    print(f"OCR model downloaded to: {path}")
+    return path
+
+
 def download_models(
     config_path: str | Path | None = None,
     image_mode: str = "pipeline",
     copy_to_local: bool = False,
+    include_ocr: bool = True,
 ) -> dict[str, str | dict]:
     """Download all configured models.
 
@@ -251,6 +285,7 @@ def download_models(
         config_path: Path to config file.
         image_mode: "pipeline" or "split" for image model download approach.
         copy_to_local: Copy downloaded models to local models/ folder.
+        include_ocr: Also download OCR model.
 
     Returns:
         Dictionary mapping model type to download path(s).
@@ -275,6 +310,10 @@ def download_models(
     )
     print()
 
+    if include_ocr:
+        paths["ocr"] = download_ocr_model(config_path)
+        print()
+
     print("=" * 50)
     print("All models downloaded successfully!")
     print("=" * 50)
@@ -284,8 +323,8 @@ def download_models(
 def list_available_models() -> None:
     """Print information about available models."""
     print("""
-Z-Image-Turbo Models
-====================
+Z-Image-Turbo Models (Image Generation)
+=======================================
 
 Pipeline Mode (Diffusers):
   - Tongyi-MAI/Z-Image-Turbo (full pipeline, ~16GB)
@@ -306,19 +345,28 @@ LLM Models
   - Qwen/Qwen2.5-3B-Instruct (smaller)
   - Qwen/Qwen2.5-14B-Instruct (larger)
 
+OCR Models (DeepSeek-OCR)
+=========================
+  - deepseek-ai/DeepSeek-OCR-2 (default, 3B params)
+  - deepseek-ai/DeepSeek-OCR (original version)
+
+  Memory requirements:
+  - Full precision: ~16GB VRAM
+  - 8-bit quantization: ~10-12GB VRAM
+  - 4-bit quantization: ~8GB VRAM
+
 Download Commands
 =================
-  # Download all (pipeline mode)
+  # Download all models
   python -m media_utils.utils.downloader all
 
-  # Download all (split files, copy to local)
+  # Download all (split files for image, copy to local)
   python -m media_utils.utils.downloader all split --local
 
-  # Download image model only (split files)
-  python -m media_utils.utils.downloader image split
-
-  # Download LLM only
+  # Download individual models
+  python -m media_utils.utils.downloader image [pipeline|split]
   python -m media_utils.utils.downloader llm
+  python -m media_utils.utils.downloader ocr
 """)
 
 
@@ -335,6 +383,7 @@ if __name__ == "__main__":
         print("  all [mode] [--local]    - Download all models")
         print("  image [mode] [--local]  - Download image model only")
         print("  llm [--local]           - Download LLM model only")
+        print("  ocr                     - Download OCR model only")
         print()
         print("Options:")
         print("  mode     - 'pipeline' (default) or 'split'")
@@ -356,6 +405,8 @@ if __name__ == "__main__":
         download_image_model(mode=mode, copy_to_local=copy_local)
     elif cmd == "llm":
         download_llm_model(copy_to_local=copy_local)
+    elif cmd == "ocr":
+        download_ocr_model()
     else:
         print(f"Unknown command: {cmd}")
         print("Run with 'help' for usage information.")

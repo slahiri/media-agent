@@ -43,6 +43,12 @@ models:
     torch_dtype: "float16"
     device: "cpu"
     max_new_tokens: 100
+  ocr:
+    name: "test/ocr-model"
+    torch_dtype: "float16"
+    device: "cpu"
+    quantization: "4bit"
+    default_resolution: "gundam"
 
 paths:
   cache_dir: "{cache_dir}"
